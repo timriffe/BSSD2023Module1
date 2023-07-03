@@ -1,0 +1,544 @@
+---
+title: |
+  | Barcelona Summer School of Demography
+  | \vspace{1.5cm} \LARGE\emph{Module~1.~Introduction to R}
+  | \vspace{0.3cm} \huge\textbf{2.~Tidy Pipelines}\vspace{0.6cm}
+fontsize: 11pt
+geometry: a4paper, twoside, left=2.5cm, right=2.5cm, top=3.2cm, bottom=2.8cm, headsep
+  = 1.35cm, footskip = 1.6cm
+output:
+  pdf_document:
+    number_sections: yes
+    fig_caption: yes
+  html_document2: default
+  html_document:
+    number_sections: yes
+    toc: yes
+  pdf_document2: default
+header-includes:
+- \usepackage{titling}
+- \pretitle{\begin{center}\includegraphics[trim=0 0 0 8cm, width=6cm]{logotipCED.png}\\[\bigskipamount]}
+- \posttitle{\end{center}}
+- \usepackage{fancyhdr}
+- \usepackage{wrapfig}
+- \pagestyle{fancy}
+- \fancyhead[LE]{\thepage~\qquad~Barcelona Summer School of Demography}
+- \fancyhead[RE]{Module~1.~Introduction to R}
+- \fancyhead[LO]{Tidy pipelines}
+- \fancyhead[RO]{T.~Riffe~\qquad~\thepage}
+- \fancyfoot[CO,CE]{\includegraphics[width=2.8cm]{logotipCED.png}}
+bibliography: bibliography.bib
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\noindent\makebox[\textwidth][c]{
+\begin{minipage}[t]{0.45\textwidth}
+\centering
+\Large{Tim Riffe} \\
+\vspace{0.1cm}\large{\texttt{tim.riffe@ehu.eus}}
+\end{minipage}
+%  \begin{minipage}[t]{0.45\textwidth}
+%    \centering
+%    \Large{Author 2} \\
+%    \vspace{0.1cm}\large{\texttt{Email address}}
+%  \end{minipage}
+}
+
+```{=tex}
+\vspace{0.8cm}
+\begin{center}
+\large{4 July 2023}
+\end{center}
+\vspace{0.8cm}
+```
+\tableofcontents
+
+# Summary
+
+In the first session we saw an intro to visualizing data that is tidy.
+Today we'll see an approach for turning messy data into tidy data:
+**data wrangling**. The exercises we'll do today are designed to expose
+you to some diversity in the functions needed to data wrangle. We'll see
+that complex processing chains (or pipelines) are composed of small and
+intuitive steps.
+
+# Data processing verbalized
+
+## case example: harmonizing and merging data sources
+
+We know we'll need tidyverse functions today, so let's just get this
+loaded:
+
+<!-- This one is displayed but not run: -->
+
+```{r, eval = FALSE}
+library(tidyverse)
+```
+
+<!-- This one runs invisibly: -->
+
+```{r, include = FALSE}
+library(tidyverse)
+```
+
+## Introducing the data sources:
+
+First make a `/Data/` folder in your project: look in the `Files` tab of
+the lower right panel, and click `New folder`. Let's download files to
+place there.
+
+### WPP 2022:
+
+I downloaded a big spreadsheet of the most recent WPP demographic
+aggregates from here:
+<https://population.un.org/wpp/Download/Standard/MostUsed/>
+
+The exact data file link is this:
+[https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/EXCEL_FILES/1_General/WPP2022_GEN_F01_DEMOGRAPHIC_INDICATORS_COMPACT_REV1.xlsx](https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/EXCEL_FILES/1_General/WPP2022_GEN_F01_DEMOGRAPHIC_INDICATORS_COMPACT_REV1.xlsx){.uri}
+
+Download it and stick it in your `/Data/` folder.
+
+### GPI 2023
+
+I downloaded Global Peace Index data from here:
+<https://www.visionofhumanity.org/public-release-data/>
+
+The exact data file link is this:
+<https://www.visionofhumanity.org/wp-content/uploads/2023/06/GPI-2023-overall-scores-and-domains-2008-2023.xlsx>
+Download it and stick it in your `/Data/` folder.
+
+It contains data summarized by them as follows
+
+`The Global Peace Index (GPI) ranks 163 independent states and territories according to their level of peacefulness. Produced by the Institute for Economics and Peace (IEP), the GPI is the world's leading measure of global peacefulness.`
+
+### Worldbank Gender Stats
+
+I downloaded selected gender stats from here:
+<https://databank.worldbank.org/source/gender-statistics#>
+
+That's an interactive selection tool with tons of options. I made an
+interactive selection that resulted in this exact file, which you can
+download from the module's github site:
+<https://github.com/timriffe/BSSD2023Module1/raw/master/Data/P_Data_Extract_From_Gender_Statistics.xlsx>
+
+Download it and stick it in your `/Data/` folder.
+
+The file contains a few haphazardly selected variables, which may or may
+not be interesting for us. The five variables included have different
+sources, including the World Bank itself, UNICEF, and assorted household
+surveys. That metadata can be found in the second spreadsheet tab.
+
+Also from World Bank, I downloaded this file:
+<https://github.com/timriffe/BSSD2023Module1/raw/master/Data/P_Popular%20Indicators.xlsx>
+Which contains a large set of popular indicators, of which we'll use GDP
+per capita and CO2 emissions per capita (from Climate Watch Historical
+GHG Emissions).
+
+### ILO data
+
+From this website <https://ilostat.ilo.org/data/data-catalogue/> I
+downloaded this file, which you can save in `/Data/`:
+<https://www.ilo.org/ilostat-files/WEB_bulk_download/indicator/SDG_0851_SEX_OCU_NB_A.csv.gz>
+This contains information on the relative wages of men and women.
+
+I also got labor force size estimates by gender from this file, so get that too!
+<https://www.ilo.org/ilostat-files/WEB_bulk_download/indicator/EAP_TEAP_SEX_MTS_NB_A.csv.gz>
+
+## The objective
+
+We want to harmonize each of these datasets to be able to join them by
+country and year. For each dataset, we'll need to succeed at:
+
+1.  Read in the relevant part of the file
+
+2.  Harmonize variables as necessary, most notably country codes
+
+3.  Select variables to keep
+
+4.  Rename variables to easy standard names
+
+For some datasets we'll want to derive secondary quantities. When we're
+done with each dataset, we can join them.
+
+## The tidyverse tools
+
+To achieve these things, we will use a bunch of basic data handling
+functions from a data wrangling package called `dplyr`, and elsewhere
+from the tidyverse as well. Here's an overview of the tools we'll use
+today:
+
+-   `read_excel()` to read in cell ranges from an Excel spreadsheet.
+-   `read_csv()` to read in from csv files
+-   `filter()` to subset rows
+-   `select()` to pick out columns
+-   `rename()` to change column names
+-   `pivot_longer()` to stack a range of columns into a single column,
+    i.e. make the data longer.
+-   `pivot_wider()` to do the opposite
+-   `mutate()` to create a new variable
+-   `separate()` to split a column into two or more based on a separator
+    character
+-   `full_join()` for a lossless merge of all data files (once they're
+    harmonized).
+
+Here's a nice cheat sheet of these tools:
+<https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf>
+
+Let's get going!
+
+## Step 1: Harmonize selected WPP variables
+
+The WPP data looks like this if we look at it in a spreadsheet program:
+
+![The WPP data, as downloaded](wpp_screenshot.png)
+
+Our objective will be to harmonize it to look like this: 
+
+![The WPP data, objective format](wpp_objective.png){width=50%}
+
+That is, we want to select and rename some columns, and we want to filter only rows referring to
+countries with ISO3 codes. ISO3 codes are the easiest way to merge
+national datasets. Way easier than trying to match country names!
+
+Here's how to successfully read in the dataset:
+
+```{r, warning=FALSE}
+library(readxl)
+wpp <- read_excel("Data/WPP2022_GEN_F01_DEMOGRAPHIC_INDICATORS_COMPACT_REV1.xlsx",
+                  skip = 16,
+                  col_types = c(rep("text",10),rep("numeric",55)),
+                  na = "...")
+```
+
+The main argument is the file path, while everything else is telling
+`read_excel()` how to do things.
+
+-   `skip = 16` tells it to skip the first 16 rows before reading. We
+    know this from visual inspection.
+
+-   `col_types` is given an exhaustive vector of the data type we want used for each column. You can skip this argument, in which case `read_excel()` guesses the column type, but for this dataset it will guess wrong for most columns! Usually it gets types right, but not here. To create the vector I use `c()` to join two vectors, and `rep()` to repeat a value a given number of times. We end up with a vector with 65 elements, the first 10 of which are `"text"`, and the last 55 of which are `"numeric"`. I got those values from visual inspection of the spreadsheet.
+
+-   `na = "..."` Different statistical agencies have different ways of specifying missing data; this one uses `...`, which I found from visual inspection.
+
+Now we have an object `wpp`, a tibble with 20596 rows and 65 columns. We'll throw out most columns for this exercise. Let's use the `select()` function to both select and rename columns, like so:
+
+```{r}
+wpp = select(
+        .data = wpp,
+        iso3 = `ISO3 Alpha-code`,
+        year = Year,
+        tfr = `Total Fertility Rate (live births per woman)`,
+        e0f = `Female Life Expectancy at Birth (years)`,
+        e0m = `Male Life Expectancy at Birth (years)`) 
+```
+This action follows the form `new name = old name`. Finally, we can select down to rows with valid ISO3 codes:
+
+```{r}
+wpp = filter(
+        .data = wpp,
+        !is.na(iso3))
+```
+Only countries have ISO3 codes, whereas the UN gives estimates also for various kinds of geographic aggregates of populations, which we don't need. 
+
+Now we have arrived at the objective format:
+
+```{r}
+head(wpp)
+```
+
+Note we achieved this in three steps: `read_excel()`, `select()`, and `filter()`. These steps can be joined into a single sequence to be executed like so:
+
+```{r, warning=FALSE}
+wpp <- 
+  read_excel(
+    "Data/WPP2022_GEN_F01_DEMOGRAPHIC_INDICATORS_COMPACT_REV1.xlsx",
+    skip = 16,
+    col_types = c(rep("text", 10),
+                  rep("numeric", 55)),
+    na = "...") |> 
+  select(iso3 = `ISO3 Alpha-code`,
+         year = Year,
+         tfr = `Total Fertility Rate (live births per woman)`,
+         e0f = `Female Life Expectancy at Birth (years)`,
+         e0m = `Male Life Expectancy at Birth (years)`) |> 
+  filter(!is.na(iso3)) 
+```
+Here the funny symbol `|>` is `R`'s native pipe operator. You can get it by typing `Ctrl Alt m` (`Cmd Option m` for mac). You might get this symbol instead: `'%>%`. That does the same thing, coming from the `magrittr` package that ships with `tidyverse`. They are the same for us. If you have a preference, you can change the default pipe operator to the native `|>` by clicking `Tools | Global Options | Code | Use Native Pipe Operator`. 
+
+The pipe merely send the result of the left-side operation to the right-side operation, forming an execution sequence. Doing this makes you code more compact, more regular, and easier to visually inspect and *verbalize*. In this case, the verbalization is *read then select and rename columns then filter rows*. The pipe is like the *then*.
+
+Whenever we read in data like this, we should get a sense of it. Here are some quick, plots of diagnostic value:
+
+1. TFR by female life expectancy (you can intuit trajectories), sort of a logistic trajectory overall.
+```{r}
+wpp |> 
+  ggplot(aes(x = e0f, y = tfr)) +
+  geom_point(alpha = .2)
+```
+
+2. Male by female life expectancy, pretty linear.
+
+```{r}
+wpp |> 
+  ggplot(aes(x = e0f, y = e0m)) +
+  geom_point(alpha = .1)
+```
+
+
+## Step 2: Harmonize GPI data
+
+The GPI spreadsheet is in wide format, with years spread over columns. This is a super common way for data to be delivered. We'll use `pivot_longer()` to stack the columns.
+
+![The GPI data, as downloaded](gpi_screenshot.png)
+
+The objective format will to have columns `iso3`, `year`, and `gpi`, and that's it. Here's the final pipeline:
+```{r}
+gpi <-
+  read_excel("Data/GPI-2022-overall-scores-and-domains-2008-2022.xlsx",
+             sheet = 2, skip = 3) |> 
+  pivot_longer(-c(1, 2),
+               names_to = "year",
+               values_to = "gpi") |> 
+  select(iso3 = iso3c, year, gpi) |> 
+  mutate(year = as.integer(year))
+
+head(gpi)
+```
+
+Let's dissect this:
+
+-    `pivot_longer()` is the hero here. We can give it a positive specification of columns to act on, or in this case tell it which columns to exclude from the action (`-c(1,2)` means skip the first and second columns. `names_to` will be a new variable collecting the column names, and `values_to` will be the new value column. What we before a value over rows and columns is now just a single column of values, `gpi`. I use lowercase for faster typing.
+
+-    `select()` picks out the three columns we want (discarding `Country`) and renames `iso3c` to `iso3`.
+
+-    `mutate()` coerces the `year` column from character to integer values.
+
+## Step 3: Harmonize World Bank data
+
+The first file of World Bank data looks like this:
+
+![The World Bank data, as downloaded](wb_screenshot1.png)
+
+Note that each row gives a time series of a single variable, and I have selected five variables! This will have some more steps. Here's the final pipeline:
+
+```{r}
+gender <-
+  read_excel("Data/P_Data_Extract_From_Gender_Statistics.xlsx",
+             na="..") |> 
+  pivot_longer(-c(1:4),names_to = "year",values_to = "value") |> 
+  select(variable = `Series Code`,
+         iso3 = `Country Code`,
+         year, value) |> 
+  pivot_wider(names_from = "variable",
+              values_from = "value") |> 
+  separate(year, into = c("year",NA),sep=" ",convert=TRUE) |> 
+  rename(sign_contract = SG.CNT.SIGN.EQ,
+         remarry = SG.REM.RIGT.EQ,
+         ind_work = SG.IND.WORK.EQ,
+         births_attend = SH.STA.BRTC.ZS,
+         births_completeness = SP.REG.BRTH.ZS) |> 
+  filter(year >= 1970)
+
+head(gender)
+```
+
+We end up with five potentially interesting variables:
+
+1.    `sign_contract`: A woman can sign a contract in the same way as a man (1=yes; 0=no)
+
+2.    `remarry`: A woman has the same rights to remarry as a man (1=yes; 0=no)
+
+3.    `ind_work`: A woman can work in an industrial job in the same way as a man (1=yes; 0=no)
+
+4.    `births_attend`: Births attended by skilled health staff (% of total)
+
+5.    `births_completeness`: Completeness of birth registration (%)
+
+The pipeline dissection:
+
+-    `read_excel()` in this case guess column types correctly, we just need to tell it the *no data* signifier `..` using `na = ".."`.
+
+-    `pivot_longer()` stacks the years, which were intitially spread over columns. This means we here end up with a single value column containing different variables in it.
+
+-    `select()` is used for variable renaming and selecting in this case, for simplified typing.
+
+-    `pivot_wider()` unstacks the different variable series, creating a unique column for each variable (part of the tidy definition). Note that we use `names_from` and `values_from` rather than `names_to` and `values_to`!
+
+-    `rename()` gives the original codes some more memorable names
+
+-    `filter()` picks out more recent years that have more valid observations. We still have lots of NAs afterwards, but no big deal.
+
+Note, this source has many many more gender-related variables, as do other providers, which you may find interesting. I have no theoretical motivation for the selection made here.
+
+### Harmonize the second World Bank extract
+
+The dataset `P_Popular Indicators` has many many interesting macro variables, of which we select only GDP per capita and CO2 emissions per capita. It is formatted as before, with time over columns and series in rows.
+
+```{r}
+gdp <- read_excel("Data/P_Popular Indicators.xlsx", 
+                  na = "..") |> 
+# Emissions data are sourced from Climate Watch Historical GHG Emissions (1990-2020). 2023. Washington, DC: World Resources Institute. Available online at: https://www.climatewatchdata.org/ghg-emissions
+  filter(`Series Code` %in% c("NY.GDP.PCAP.CD","EN.ATM.CO2E.PC")) |> 
+  pivot_longer(-c(1:4),
+               names_to = "year",
+               values_to = "value") |> 
+  select(-`Series Code`) |> 
+  pivot_wider(names_from = `Series Name`, 
+              values_from = value) |> 
+  separate(year, 
+           into = c("year", NA),
+           sep = " ",
+           convert = TRUE) |> 
+  rename(iso3 = `Country Code`,
+         co2pc = `CO2 emissions (metric tons per capita)`,
+         gdppc = `GDP per capita (current US$)`)
+```
+
+The dissection gives some new lessons, however:
+
+-    `filter()` uses an operator `%in%` that is great for checking set membership. This operator is super useful.
+
+-    `pivot_longer()` collects the years as before
+
+-    `select()` shows us a negative selection. If we don't throw out this column before the next step then we'll do the wrong thing. Try it!
+
+-    `pivot_wider()` puts each variable in a new column, unstacking `value`
+
+-    `separate()` is used to convert `"1960 [YR1960]"` into `1960`. There are other ways one might do this. For example, selecting out the first four characters and then parsing to integer... In this case, we split the column into two columns, using the space as the separator. The new column is still called `year`, whereas the second column is discarded by giving `NA` as the name. The `convert` option tells the function to guess the intended data type, since in this case we're always text parsing, and often the extracted characters give a numeric value.
+
+-    `rename()` is used to simplify column names to something less verbose.
+
+Exercise: can you imagine some diagnostic plots for this dataset and create them?
+
+## Step 4: Harmonize the ILO data
+
+The ILO data look like this:
+
+![The ILO data, as downloaded](ilo_screenshot.png)
+
+In this case, we have indicators still stacked, but at least years are also already stacked. You can see from the start that there are data gaps for certain years / places as well. That's something we might want to remedy using interpolation of some kind, but that doesn't fit in today's lesson.
+
+In this data, the interesting thing for us are male and female wages, and we're content to end up with a simple national aggregate wage ratio at the end of the pipeline.
+```{r, warning=FALSE}
+wage <-
+  read_csv("Data/SDG_0851_SEX_OCU_NB_A.csv.gz",
+           show_col_types = FALSE) |> 
+  filter(classif1 == "OCU_SKILL_TOTAL") |> 
+  select(iso3 = ref_area,
+         sex,
+         year = time,
+         value = obs_value) |> 
+  pivot_wider(names_from = sex,
+              values_from = value) |> 
+  mutate(wage_ratio = SEX_F / SEX_M) |> 
+  select(iso3, year, wage_ratio) |> 
+  arrange(iso3,year)
+
+head(wage)
+```
+
+The dissection of this pipeline shows us some new tricks as well:
+
+-    `read_csv()` is used even though the csv file is g-zipped :-). We make it less verbose by telling it not to spit the colum metadata to the console `show_col_types = FALSE`.
+
+-    `filter()` picks out just the national totals. We could also drill down to grouped occupation codes, apparently, but let's discard those for now.
+
+-    `select()` just gives us something more parsimonious and manageable
+
+-    `pivot_wider()` puts mens and women's wages side by side.
+
+-    `mutate()` is used to make us a new column for the wage ratio (women / men)
+
+-    `arrange()` sorts the result first by country, then year within country.
+
+Exercise: read in the file `Data/EAP_TEAP_SEX_MTS_NB_A.csv.gz` and create an object `lf` containing labor for size by gender. The resulting columns should be like this:
+
+![The second ILO data objective](ilo_objective2.png){width=50%}
+The code should be quite similar to the other ILO dataset code. `lff` and `lfm` come from the variable `classif1 == "MTS_AGGREGATE_TOTAL"`, and then putting men and women side by side.
+
+And finally a note, ILO also delivers age-sex stratified data, which may be interesting to some of you :-)
+
+## Step 5 Join the data 
+
+Now, if you succeeded in creating the `lf` dataset we should have several data objects: `wpp`, `gpi`, `gender`, `gdp`, `wage`, and `lf`. There are different ways to join data. Here let's do a lossless-join, meaning match whatever we can, but throw nothing away (i.e. pad with `NA` values where needed). Then later, if needed, we can always filter down to just the interesting subsets, depending on what's interesting.
+
+This sort of join is called a `full_join()`, we just need to tell the function what two datasets to join, and which variables to treat as the key for matching. We need to do this two pieces at a time, like so:
+```{r}
+wpp |> 
+  full_join(gpi, by = c("iso3","year")) |> 
+  full_join(gender, by = c("iso3", "year"))
+```
+
+Exercise: join all six datasets in a single pipeline, assigning the result to a new data object called `gapreminder`. But don't save the result just yet, there's still some cleanup to do!
+
+```{r, echo = FALSE}
+lf <- read_csv("Data/EAP_TEAP_SEX_MTS_NB_A.csv.gz",
+               show_col_types = FALSE) |> 
+  filter(classif1 == "MTS_AGGREGATE_TOTAL") |> 
+  select(iso3 = ref_area,
+         sex,
+         year = time,
+         value = obs_value) |> 
+  pivot_wider(names_from = sex,
+              values_from = value) |> 
+  select(iso3,year,lfm=SEX_M,lff = SEX_F)
+
+gapreminder <-
+  wpp |> 
+  full_join(gpi, by = c("iso3", "year")) |> 
+  full_join(gender, by = c("iso3", "year")) |> 
+  full_join(gdp, by = c("iso3", "year")) |> 
+  full_join(wage, by = c("iso3", "year")) |> 
+  full_join(lf, by = c("iso3", "year"))
+```
+
+```{r, eval = FALSE}
+write_csv(gapreminder, file = "Data/gapreminder.csv")
+```
+
+You might notice that we have a `Country Name` column, which we might as well move towards the front of the dataset:
+```{r}
+head(gapreminder)
+gapreminder <-
+  gapreminder |> 
+  relocate(`Country Name`, 2) |> 
+  rename(country = `Country Name`)
+```
+
+And you might then notice that some country names aren't present for particular ISO3 codes! We can fill these in, or even easier, overwrite the country column using a coding service, like the `countrycode` `R` package, which exists for this sort of thing. Install it (note in my markdown file I use `eval = FALSE`:
+
+```{r, eval = FALSE}
+install.packages("countrycode")
+```
+```{r}
+library(countrycode)
+gapreminder<-
+  gapreminder |> 
+  mutate(country = countrycode(sourcevar = iso3, 
+                               origin = "iso3c",
+                               destination = "country.name",
+                               warn = FALSE)) |> 
+  filter(!is.na(country))
+```
+
+Here, we use the function `countrycode()` to create fresh country names from an ISO3 lookup table. Note, many of the values in `iso3` will fail to reference country names. These come from the World Bank geographic aggregates (e.g. AFE = Eastern Africa). We can discard these. Most major coding systems are covered in this helper package, and as far as I know the package is actively maintained to keep up with the times. For instance, you can see that the code `SWZ` correctly produced `Eswatini` in the `country` column (name changed from Swaziland in 2018), and other name changes are sooner or later incorporated.
+
+Note, I've added the resulting file to the github repository, in case you need it, but I encourage you to create it yourself.
+
+If you have created the dataset in a live session, then you already have it handy to work with. But if you have it saved, then you can just read it directly to `R` and skip the prior steps. That just looks like this:
+
+```{r, eval = FALSE}
+gapreminder2 <-
+  read_csv("Data/gapreminder.csv")
+colnames(gapreminder2)
+colnames(gapreminder)
+```
+
+
+
