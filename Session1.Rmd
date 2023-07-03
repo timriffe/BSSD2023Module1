@@ -1,0 +1,247 @@
+---
+title: "Session 1 notes"
+author: "Tim Riffe"
+date: "2023-07-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is a code chunk. To get one started, click: `Ctrl Alt i` on mac: `Cmd Option i`
+
+```{r}
+1+1
+```
+
+To execute the code that's in a chunk, you can either (i) click the green button, in which case it'll try to execute the whole chunk, or (ii) put your cursor somewhere on the line you want to execute and click `Ctrl Enter` (`Cmd Enter` on mac)
+
+## a function
+
+This example from the template is showing a basic function, `summary()`, which is being fed the generic dataset `cars`, one of the many toy datasets available to you.
+
+```{r}
+summary(cars)
+```
+
+Everything in `R` gets done using functions. There are tons of functions available to you, already. We'll see a bunch. But also you can write your own. We'll learn to do this on Wednesday.
+
+## back to Rmarkdown
+Doing this module in R markdown has a note-taking advantage, but it also has the artifact of making whatever you're doing reproducible. It does this because all the materials needed to *build* the document are sitting right here in the same folder. In this case, it's just this Markdown script.
+
+### Another cool thing
+You can also execute stata or python (or 30ish other languages) straight from R markdown.
+
+## code chunks see each other
+
+`Ctrl Alt i` made the chunk
+I make an object by *assigning* to it using the `<-`.
+`rnorm(10)` creates 10 random deviates from the standard normal distribution.
+```{r}
+my_first_object <- rnorm(n = 10, mean = 2)
+
+```
+Now the object `my_first_object` is available in the environment for later use. As in, in posterior code chunks. And you can have lots of objects created and in active memory at the same time, and they can be used together.
+
+```{r}
+my_first_object + 1
+my_first_object * 2
+
+my_second_object <- runif(10)
+my_first_object * my_second_object
+```
+These basic objects are both vectors. You can operate on vectors with a scalar, i.e. a single value, or with another vector of the same length. In that case, you get element-wise operations.
+
+## Experience
+
+Note that I've explicitly stated that objects need to be of conformable dimensions in order to operate together. 
+The data relationships, i.e. arithmetic or statistical formulas are displayed on top, in your code. And what you look at is code. The data are not displayed, unless you ask to see them. 
+
+If there are any errors in the execution of code, then the document will not build. This code provokes an error because `"a"` is a character and it doesn't make sense to multiply it with numbers. I can deactivate this chunk (it will still display) by specifying `eval = FALSE`.
+```{r, eval = FALSE}
+"a" * my_first_object
+```
+
+```{r, results = "hide"}
+my_third_object <- my_first_object * 2
+```
+
+Result not shown above, but we do have `my_third_object` available:
+```{r, echo = FALSE}
+my_third_object
+```
+
+To show the result but not the code that produced it, use `echo = FALSE`
+
+# tidy data
+
+Now let's work with a dataset that is tidy from the start, in order to show some basic plotting techniques that we can apply on already-tidy data. Tomorrow we'll worry about how to make data tidy in the first place.
+
+```{r}
+# install.packages("gapminder")
+library(gapminder)
+gapminder
+View(gapminder)
+```
+
+We installed the `gapminder` package from `R` using `install.packages()`, which needs an exactly-spelled character string. R cares about capitalization. Then I commented that line out because otherwise it would redundantly reinstall every time this file is *built*. Then to look at it, I just typed `gapminder` and executed that, which gives a rudimentary browser right here in the markdown. You can also get a sense of the data with other helper functions.
+
+`View()` opens it in a new table viewer.
+`str()` tells you the data types of the columns.
+```{r}
+str(gapminder)
+```
+
+The `summary()` function works on this data too; it behaves differently depending on the data type of each column, and I've told it to hide the results to reduce clutter.
+```{r, results = 'hide'}
+summary(gapminder)
+```
+
+## `gapminder` is tidy
+
+Tidy data is rectangular (a table) data formatted such that each row is an observation, and each column is a variable. Some variables might be used to uniquely identify an observation (i.e. pid, or like strata combinations such as age, sex, time). In aggregate demography, variables that identify an observation are aspects of population structure. Then other variables are for the characteristics of the observations. Sometimes the structural variables are the majority and sometimes the characteristics (covariates) are the majority of variables.
+
+Usually, data don't arrive in your hands in a tidy format already. You have to do something to them (often) in order to achieve this. That's tomorrow's lesson. Today, let's just see the frosting on the cake:
+
+## `ggplot`
+
+gg stands for grammar of graphics, meaning someone (C Wilkinson?) sat down and thought of a way to systematize / abstract the elements and decisions of data visualization. These choices include (i) coordinates, position (ii) geometric form, (iii) aesthetic mappings.
+```{r}
+# install.packages("tidyverse")
+library(tidyverse)
+ggplot(gapminder, 
+       mapping = aes(x = gdpPercap,
+                     y = lifeExp,
+                     size = pop,
+                     color = continent)) +
+  geom_point(alpha = .3) +
+  scale_x_log10()
+```
+
+The mapping that we declare inside `ggplot()` is fundamental. At a minimum, it must include the coordinates. The other aesthetic mappings we gave (size and color) can be given in the `ggplot()` function, or individually in the geom(s). Since we only have one geom here, there's no sense in that, but this is what I mean:
+
+```{r}
+ggplot(gapminder, 
+       mapping = aes(x = gdpPercap,
+                     y = lifeExp)) +
+  geom_point(mapping = aes(color = continent,
+                           size = pop),
+             alpha = .3) +
+  scale_x_log10() +
+  geom_smooth()
+```
+
+We got one smoother for the whole point cloud because color and size we mapped only for the points. Maybe you want that. Maybe not. If you want a smoother for each continent, then you need to tell it so.
+
+```{r}
+ggplot(gapminder,
+       mapping = aes(x = gdpPercap,
+                     y = lifeExp,
+                     color = continent)) +
+  geom_point(mapping = aes(size = pop),
+             alpha = .3) +
+  scale_x_log10() +
+  # we don't like this:
+  #geom_smooth(mapping = aes(group = continent)) 
+  geom_smooth()
+```
+
+Question on color mapping: what does it mean.
+Answer: ggplot tries to make a reasonable choice based on the data type being mapped to color. Qualitative palette for qualitative data, sequential palette for quantitative data.
+
+```{r}
+ggplot(gapminder,
+       mapping = aes(x = gdpPercap,
+                     y = lifeExp,
+                     color = year,
+                     alpha = year)) +
+  geom_point() +
+  scale_x_log10()
+```
+
+You can tell geoms to use different ramps if you want. Will prepare examples in other days.
+
+Question: how to highlight a specific line? 
+1. first plot the other lines in the background
+2. then plot the subset of data you want to highlight on top of it, giving the new data subset only to that geometric layer.
+
+* Do the highlighted line last because it should be on top.
+```{r}
+ggplot(gapminder,
+       mapping = aes(x = year,
+                     y = lifeExp,
+                     group = country)) +
+  geom_line(alpha = .4) +
+  geom_line(data = filter(gapminder, country == "Colombia"),
+            color = "red",
+            linewidth = 4)
+
+```
+
+```{r}
+ggplot(data = gapminder,
+       mapping = aes(x = year,
+                     y = lifeExp,
+                     group = country)) +
+  geom_line() +
+  facet_wrap(~continent) +
+  geom_line(data = filter(gapminder, country %in% c("Rwanda", "Cambodia","El Salvador","Albania")),
+            color = "red",
+            size = 2)
+```
+
+# Exercise:
+
+Make the continent panel plot adding a line to each panel. Tip: use `geom_smooth()`, specifying `method = "lm"` in its arguments.
+
+```{r}
+ggplot(gapminder,
+       mapping = aes(x = year,
+                     y = lifeExp)) +
+  geom_line(mapping = aes(group = country)) +
+  facet_wrap(~continent) +
+  geom_smooth(method = "lm", size = 2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
