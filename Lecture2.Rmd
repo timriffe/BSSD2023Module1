@@ -64,13 +64,9 @@ knitr::opts_chunk$set(echo = TRUE)
 In the first session we saw an intro to visualizing data that is tidy.
 Today we'll see an approach for turning messy data into tidy data:
 **data wrangling**. The exercises we'll do today are designed to expose
-you to some diversity in the functions needed to data wrangle. We'll see
-that complex processing chains (or pipelines) are composed of small and
-intuitive steps.
+you to some diversity in the functions needed to data wrangle. We'll see that complex processing chains (or pipelines) are composed of small and intuitive steps.
 
 # Data processing verbalized
-
-## case example: harmonizing and merging data sources
 
 We know we'll need tidyverse functions today, so let's just get this
 loaded:
@@ -89,9 +85,7 @@ library(tidyverse)
 
 ## Introducing the data sources:
 
-First make a `/Data/` folder in your project: look in the `Files` tab of
-the lower right panel, and click `New folder`. Let's download files to
-place there.
+First make a `/Data/` folder in your project: look in the `Files` tab of the lower right panel, and click `New folder`. Let's download files to place there.
 
 ### WPP 2022:
 
@@ -182,8 +176,7 @@ today:
     i.e. make the data longer.
 -   `pivot_wider()` to do the opposite
 -   `mutate()` to create a new variable
--   `separate()` to split a column into two or more based on a separator
-    character
+-   `separate()` to split a column into two or more based on a separator character
 -   `full_join()` for a lossless merge of all data files (once they're
     harmonized).
 
@@ -198,9 +191,7 @@ The WPP data looks like this if we look at it in a spreadsheet program:
 
 ![The WPP data, as downloaded](wpp_screenshot.png)
 
-Our objective will be to harmonize it to look like this: 
-
-![The WPP data, objective format](wpp_objective.png){width=50%}
+Our objective will be to harmonize it to end up with columns for `iso3`, `year`, `tfr`, `e0f`, `e0m`, `popf`, `popm`, where e0 means life expectancy at birth.
 
 That is, we want to select and rename some columns, and we want to filter only rows referring to
 countries with ISO3 codes. ISO3 codes are the easiest way to merge
@@ -235,7 +226,9 @@ wpp = select(
         year = Year,
         tfr = `Total Fertility Rate (live births per woman)`,
         e0f = `Female Life Expectancy at Birth (years)`,
-        e0m = `Male Life Expectancy at Birth (years)`) 
+        e0m = `Male Life Expectancy at Birth (years)`,
+        popf = `Female Population, as of 1 July (thousands)`,
+        popm = `Male Population, as of 1 July (thousands)`) 
 ```
 This action follows the form `new name = old name`. Finally, we can select down to rows with valid ISO3 codes:
 
@@ -262,11 +255,14 @@ wpp <-
     col_types = c(rep("text", 10),
                   rep("numeric", 55)),
     na = "...") |> 
-  select(iso3 = `ISO3 Alpha-code`,
-         year = Year,
-         tfr = `Total Fertility Rate (live births per woman)`,
-         e0f = `Female Life Expectancy at Birth (years)`,
-         e0m = `Male Life Expectancy at Birth (years)`) |> 
+ select(
+   iso3 = `ISO3 Alpha-code`,
+   year = Year,
+   tfr = `Total Fertility Rate (live births per woman)`,
+   e0f = `Female Life Expectancy at Birth (years)`,
+   e0m = `Male Life Expectancy at Birth (years)`,
+   popf = `Female Population, as of 1 July (thousands)`,
+   popm = `Male Population, as of 1 July (thousands)`) |> 
   filter(!is.na(iso3)) 
 ```
 Here the funny symbol `|>` is `R`'s native pipe operator. You can get it by typing `Ctrl Alt m` (`Cmd Option m` for mac). You might get this symbol instead: `'%>%`. That does the same thing, coming from the `magrittr` package that ships with `tidyverse`. They are the same for us. If you have a preference, you can change the default pipe operator to the native `|>` by clicking `Tools | Global Options | Code | Use Native Pipe Operator`. 
@@ -527,18 +523,118 @@ gapreminder<-
   filter(!is.na(country))
 ```
 
-Here, we use the function `countrycode()` to create fresh country names from an ISO3 lookup table. Note, many of the values in `iso3` will fail to reference country names. These come from the World Bank geographic aggregates (e.g. AFE = Eastern Africa). We can discard these. Most major coding systems are covered in this helper package, and as far as I know the package is actively maintained to keep up with the times. For instance, you can see that the code `SWZ` correctly produced `Eswatini` in the `country` column (name changed from Swaziland in 2018), and other name changes are sooner or later incorporated.
+Here, we use the function `countrycode()` to create fresh country names from an ISO3 lookup table. Note, many of the values in `iso3` will fail to reference country names. These come from the World Bank geographic aggregates (e.g. AFE = Eastern Africa). We can discard these. Most major coding systems are covered in this helper package, and as far as I know the package is actively maintained to keep up with the times. For instance, you can see that the code `SWZ` correctly produced `Eswatini` in the `country` column (name changed from Swaziland in 2018), and other name changes are sooner or later incorporated. That may or may not make sense to do, for instance if the population of a universe of a given code changes over time. We won't deal with that problem now.
+
+It should look like so now:
+```{r}
+gapreminder |> glimpse()
+```
+
+Let's write the resulting `gapreminder` file out to a csv:
+```{r, eval = FALSE}
+gapreminder |> 
+  write_csv("Data/gapreminder.csv")
+```
+
 
 Note, I've added the resulting file to the github repository, in case you need it, but I encourage you to create it yourself.
 
 If you have created the dataset in a live session, then you already have it handy to work with. But if you have it saved, then you can just read it directly to `R` and skip the prior steps. That just looks like this:
 
 ```{r, eval = FALSE}
-gapreminder2 <-
+gapreminder <-
   read_csv("Data/gapreminder.csv")
-colnames(gapreminder2)
-colnames(gapreminder)
 ```
 
+## Explre the data
 
+Now the data are fairly tidy, depending on your ends. You can already start making some informative plots.
 
+### How has birth registration completeness changed over time?
+
+```{r, warning = FALSE, message =FALSE}
+gapreminder |> 
+  filter(!is.na(births_completeness)) |> 
+  ggplot(aes(x = year, y = births_completeness)) +
+  geom_line(mapping = aes(group = country)) +
+  geom_smooth(method = "lm") + 
+  labs(title = "We should probably redo birth registration completeness estimates for the world") 
+```
+
+These estimates mostly come from indirect methods, and it looks like this dataset isn't a comprehensive time series, although it does cover 180 countries.
+
+# Exercises
+
+### 1. How do C02 emissions per capita map to life expectancy or TFR?
+(level 1 tricky)
+
+```{r, eval = FALSE}
+gapreminder |> 
+  ggplot() # ...
+```
+
+For life expectancy, is the relationship similar to the original Preston curve? Which one is a stronger apparent relationship?
+
+### 2. Best practice life expectancy
+(level 2 tricky)
+
+Make a scatterplot of life expectancy, with males and females in different panels, drawn as a background point cloud (light gray and semitransparent or similar). For each panel and each year, highlight the highest observed life expectancy using red points. Add a fitted line to the series of record high life expectancies by sex. Add another fitted line to the overall point cloud of life expectancy. Add a narrative title.
+
+Here's how to get the highest life expectancy per year and sex, in order to get you started:
+```{r}
+gapreminder |> 
+  filter(year < 2022) |> 
+  select(year, e0f, e0m) |> 
+  pivot_longer(-1, names_to = "sex", values_to = "e0") |> 
+  mutate(sex = substr(sex,3,3)) |> 
+  group_by(year, sex) |> 
+  filter(e0 == max(e0, na.rm = TRUE)) |> 
+  arrange(sex, year)
+```
+
+In order to make the point cloud, you'll want to do something similar to the above, but without the `group_by()` and `filter()` steps. I suggest creating the two clean datasets (sssigning them to objects) and then composing the plot.
+
+### 3. Does the Preston curve look different for men and women?
+(level 3 tricky)
+
+Here we have a conundrum: we have life expectancy by sex, but we don't know how to split gdp per capita. We do know the size of the labor force by gender though; and we also know relative wages (conditional on being employed). So maybe if you (very wrongly) assume that the entire GDP is made up of wages (it definitely is not!), then we could have a guess at it. Doing a good job of this (i.e. also splitting capital returns on gender somehow?) would be a difficult task that I think lots of people would like to see. You might try by using NTA data: <https://www.ntaccounts.org/web/nta/show/>. Let's do a bad job of it for now using brave assumptions and the data we have.
+
+We know the labor force size, and the relative wages conditional on work, so also assuming that wages are have been standardized to the same working hours (also bad assumption), we can calculate the relative share of total wages that belongs to men and women, and then split GDP proportional to that.
+
+Specifically, we have $W_f$ the female to male wage ratio, which we can convert to proportions $p_f$ and $p_m$ like so:
+
+$$
+p_f = \frac{W_f}{1 + W_f}
+$$
+Where $p_m$ is just the complement of $p_f$. The interpretation is that for equivalent working time, men get $p_m$ proportion of wages and women get $p_f$. Then if each worker works the same amount, we can multiply the labor force size $LF_f$ and $LF_m$ to get something proportional to total wages earned for men and women $TW_m$ and $TW_f$. 
+
+$$
+TW_f = p_f \cdot LF_f
+$$
+Then split total GDP proportional to $TW_f$ and $TW_m$, convert back to per capita GDP by gender.
+
+```{r, include = FALSE}
+gapreminder |> 
+  mutate(pf = wage_ratio / (1 + wage_ratio),
+         pm = 1 / (1 + wage_ratio), 
+         gdp = (popm + popf) * gdppc,
+         TFf = lff * pf,
+         TFm = lfm * pm,
+         gdpf = gdp * TFf / (TFf+TFm),
+         gdpm = gdp * TFm / (TFf+TFm),
+         gdppcf = gdpf / popf,
+         gdppcm = gdpm / popm) |> 
+  select(iso3, year, e0f, e0m, gdppcf, gdppcm) |> 
+  pivot_longer(-c(1,2),names_to = "variable", values_to = "value") |> 
+  mutate(gender = if_else(grepl(variable, pattern = "m"),"m","f"),
+         variable = if_else(grepl(variable,pattern = "e0"),"e0","gdppc")) |> 
+  pivot_wider(names_from = variable, values_from = value) |> 
+  ggplot(aes(x = gdppc, y = e0,color = gender)) +
+  geom_point() +
+  scale_x_log10() +
+  geom_smooth() +
+  ylim(50,86) +
+  labs(title = "Preston curve by gender",
+       subtitle = "The calcs behind this are so sloppy it hurts")
+
+```
