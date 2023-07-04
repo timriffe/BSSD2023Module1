@@ -224,6 +224,8 @@ inner_join(gpi, wpp, by = c("iso3","year"))
 full_join(gpi, wpp, by = c("iso3","year"))
 ```
 
+We can just join a couple datasets at a time, but we can string them togther into a pipeline at least. Note this is a smaller version that what I had prepared for the handout. You can find the complete `gapreminder` dataset on my github.
+
 ```{r}
 gapreminder <-
   wpp |> 
@@ -233,10 +235,11 @@ gapreminder <-
   full_join(lf, by = c("iso3", "year"))
 ```
 
-Exercise:
+### Exercise:
 Is the Preston curve (with GDP logged) a stronger relation than CO2 per capita vs life expectancy? Should we use the total population life expectancy or female or male? Is the relationship stronger for females or males? Produce some visual evidence. I encourage the use of narrative plot titles.
 
-```{r}
+The strategy I took here to make the side-by-side facet, was to stack the two versions being compared using `pivot_longer()`. I first tried the Preston curve using male and female life expectancy separately, no huge difference; then I switched to CO2 instead of GDP, same story: no big difference; finally (code below) I selected female life exepctancy and related it to both GDP and Emissions side-by-side.
+```{r, warning = FALSE}
 gapreminder |> 
   filter(year >= 2008) |> 
   select(e0f, co2pc, gdppc) |> 
