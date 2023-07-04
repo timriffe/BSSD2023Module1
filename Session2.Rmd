@@ -1,0 +1,129 @@
+---
+title: "Session 2 Notes"
+author: "Tim Riffe"
+date: "2023-07-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data wrangling
+
+Today we'll see some tools that we can use to 
+1. Read in spreadsheet data and csv data
+2. select columns and filter rows
+3. create or modify columns
+4. reshape data (wide to long and vice versa)
+5. recode data
+And other tricks.
+
+Finally, we'll merge all the datasets we manage to harmonize.
+
+### WPP data
+```{r}
+library(tidyverse)
+library(readxl)
+```
+
+For this spreadsheet, it's best to visually inspect to get a sense of what rows to skip and how to treat NAs, and possibly other oddities. Here we skip the first 16 rows, and declare that `"..."` should be treated as NA (as will empty cells).
+```{r}
+wpp <- read_excel("Data/WPP2022_GEN_F01_DEMOGRAPHIC_INDICATORS_COMPACT_REV1.xlsx",
+           skip = 16,
+           na = "...")
+
+nrow(wpp)
+```
+
+Next let's filter down to only those rows that have valid ISO3 codes.
+
+```{r}
+colnames(wpp)
+
+wpp <-
+  filter(wpp,
+         !is.na(`ISO3 Alpha-code`))
+nrow(wpp)
+```
+
+The function `is.na()` asks a vector which elements are NAs, returning TRUE for NAs and FALSE for everything else.
+
+The operator `!` negates this, meaning that TRUE becomes FALSE and vice versa.
+
+`filter()` selects rows using TRUE and FALSE.
+
+Now we should select the columns we actually want:
+
+```{r}
+colnames(wpp)
+wpp <-
+  select(wpp,
+         iso3 = `ISO3 Alpha-code`,
+         year = Year,
+         popm = `Male Population, as of 1 July (thousands)`,
+         popf = `Female Population, as of 1 July (thousands)`,
+         tfr = `Total Fertility Rate (live births per woman)`,
+         e0m = `Male Life Expectancy at Birth (years)`,
+         e0f = `Female Life Expectancy at Birth (years)`)
+```
+Note, we select columns and rename them at the same time, anything not named gets thrown out. We need to use back-ticks around arduous names that have spaces.
+
+The point was made that overwriting a `wpp` object is risky and clunky. Some folks would do so in sequence, creating several unique staged versions of `wpp`, e.g. `wpp1`, `wpp2` ... Instead, we can string these statements, or steps into sentences. Or pipelines. Or single sequenced execution steps.
+```{r}
+wpp <- read_excel("Data/WPP2022_GEN_F01_DEMOGRAPHIC_INDICATORS_COMPACT_REV1.xlsx",
+           skip = 16,
+           na = "...") |> 
+  filter(!is.na(`ISO3 Alpha-code`)) |> 
+  select(iso3 = `ISO3 Alpha-code`,
+         year = Year,
+         popm = `Male Population, as of 1 July (thousands)`,
+         popf = `Female Population, as of 1 July (thousands)`,
+         tfr = `Total Fertility Rate (live births per woman)`,
+         e0m = `Male Life Expectancy at Birth (years)`,
+         e0f = `Female Life Expectancy at Birth (years)`)
+```
+
+```{r}
+ggplot(wpp, 
+       mapping = aes(x = e0f,
+                     y = e0m)) + 
+  geom_point(mapping = aes(group = iso3)) + 
+  geom_smooth(method = "lm")
+
+wpp |> 
+  ggplot(aes(x = e0f, y = tfr)) +
+  geom_point(alpha = .2)
+
+```
+
+
+### GPI data
+
+The GPI data we want are on the second sheet, so we specify `sheet = 2`, and to `skip` the first 3 rows. Otherwise, it's a simple format.
+
+Then we need to convert the data rectangle to a tidy format, so we can make year a variable rather than having a unique column per year. This we do with the `pivot_longer()` function, which needs a column range (in this case skipping the first two columns), and a name to call the newly created *name collector* column (`names_to`), and place to store the values `values_to`. Then we follow with a select and rename step, and finally coerce `year` to integer using `as.integer()`. We do this inside of `mutate()`, which is used for modifying or creating columns.
+
+```{r}
+gpi <-
+  read_excel("Data/GPI-2022-overall-scores-and-domains-2008-2022.xlsx",
+             skip = 3,
+             sheet = 2) |> 
+  pivot_longer(-c(1,2), names_to = "year", values_to = "gpi") |> 
+  select(iso3 = iso3c,
+         year,
+         gpi) |> 
+  mutate(year = as.integer(year))
+gpi
+```
+
+
+
+
+
+
+
+
+
+
+
