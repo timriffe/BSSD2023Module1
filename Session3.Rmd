@@ -133,5 +133,62 @@ lxqx_to_dx <- function(lx,qx){
   lx * qx
 }
 dx <- lxqx_to_dx(lx,qx)
+plot(age,lx)
 ```
 
+# $L(x)$
+
+Lifetable exposure (synthetic exposure) is the area between steps in $l(x)$. We can approximate it using the trapezoid integration method.
+
+$l(x) * 1$ is an overestimate of $L(x)$ because some drop out.
+$ d(x)$ is the size of the decrement, of which about 1/2 needs to be included because those dropping out spend on average about 1/2 of their time in the interval. But we need to count the time of those that make it to the end of the interval, not those who die. That's why we do $(1-a(x))$
+
+$$ L(x) = l(x) - (1- a(x)) \cdot d(x)$$
+
+```{r}
+lxdx_to_Lx <- function(lx,ax,dx){
+  Lx <- lx - (1- ax) * dx
+  return(Lx)
+}
+Lx <- lxdx_to_Lx(lx,ax,dx)
+
+```
+
+# $T(x)$ a helper variable
+
+$$ T(x) = \sum _{i=x}^\omega L(i)$$
+`cumsum()` takes a cumulative sum over a vector.
+`rev()` can be used to reverse the order of the elements of a vector.
+We want a function called `Lx_to_Tx()`
+```{r}
+Lx_to_Tx <- function(Lx){
+  Tx <-
+    # start with the Lx by age
+    Lx |> 
+    # turn it backwards
+    rev() |> 
+    # then take the cumulative sum
+    cumsum() |> 
+    # and put it back in the original age order
+    rev()
+  return(Tx)
+}
+Tx <- Lx_to_Tx(Lx)
+# same thing but harder to read:
+# rev(cumsum(rev(Lx)))
+```
+
+# $e(x)$
+
+$$ e(x) = \frac{T(x)}{ l(x)}$$
+Explainer: $T(x)$ are the synthetic years lived beyond a given age $x$. We can't simply take this as a direct estimate of the expectancy for age $x$ though: it's two small, because it isn't yet conditional on having survived to age $x$: we need to scale it up by making $e(x)$ conditional on survival to $x$.
+
+```{r}
+Txlx_to_ex <- function(Tx, lx){
+  ex <- Tx / lx
+  return(ex)
+}
+ex <- Txlx_to_ex(Tx, lx)
+```
+
+# collect the functions some place handy
