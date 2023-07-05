@@ -1,0 +1,79 @@
+---
+title: "Session 2 Solutions"
+author: "Tim Riffe"
+date: "2023-07-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Best practice life exectancy:
+
+Make a scatterplot of life expectancy, with males and females in different panels, drawn as a background point cloud (light gray and semitransparent or similar). For each panel and each year, highlight the highest observed life expectancy using red points. Add a fitted line to the series of record high life expectancies by sex. Add another fitted line to the overall point cloud of life expectancy. Add a narrative title.
+
+Here's how to get the highest life expectancy per year and sex, in order to get you started. 
+```{r}
+library(tidyverse)
+gapreminder <- read_csv("https://raw.githubusercontent.com/timriffe/BSSD2023Module1/master/Data/gapreminder.csv", show_col_types = FALSE) 
+
+best_practice <-
+  gapreminder |> 
+  filter(year < 2022) |> 
+  select(country, year, e0f, e0m) |> 
+  pivot_longer(e0f:e0m, names_to = "sex", values_to = "e0") |> 
+  mutate(sex = if_else(sex == "e0f","Women","Men")) |> 
+  group_by(year, sex) |> 
+  filter(e0 == max(e0, na.rm = TRUE)) |> 
+  ungroup() |> 
+  arrange(sex, year)
+```
+
+Now let's make the background point cloud:
+```{r, warning = FALSE, message = FALSE}
+gapreminder |> 
+  select(year, e0f, e0m) |> 
+  pivot_longer(-1, names_to = "sex", values_to = "e0") |> 
+  mutate(sex = if_else(sex == "e0f","Women","Men")) |> 
+  # here begins the plot
+  ggplot(aes(x = jitter(year), y = e0)) +
+  # the background point cloud:
+  geom_point(color = gray(.4), 
+             alpha = .1, 
+             size = .5) +
+  geom_smooth(method = "lm", 
+              linewidth = .5, 
+              color = "#132294") +
+  # declare the facet
+  facet_wrap(~sex) +
+  
+  # the best practice part
+  geom_point(data = best_practice,
+             color = "red",
+             size = .5) +
+  geom_smooth(data = best_practice,
+              method = "lm", 
+              color = "#941347",
+              linewidth = .5) +
+  theme_minimal() +
+  labs(x = "year", 
+       y = "Life Expectancy at Birth",
+       title = "The global average life expectancy trend\nincreases faster than best practice life expectancy")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
