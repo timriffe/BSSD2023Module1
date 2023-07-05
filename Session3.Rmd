@@ -189,6 +189,123 @@ Txlx_to_ex <- function(Tx, lx){
   return(ex)
 }
 ex <- Txlx_to_ex(Tx, lx)
+ex
 ```
 
 # collect the functions some place handy
+
+```{r}
+source("my_functions.R")
+# source("https://raw.githubusercontent.com/timriffe/BSSD2023Module1/master/my_functions.R")
+```
+
+Then a bunch of functions can be loaded by `source()`ing an `R` script.
+This is indeed how people put thogether their reproducibility packs for papers: They organize the steps of their research into R scripts to be executed in sequence, and then make a simpler R script that just sources those steps. You can find the reproducibility packs of people Like Jose Manuel Aburto, Monica Alexander, Ilya Kashnitsky, or Jonas Schöley. They are referenced from the given paper and usually are sitting in a repository service such as GitHub, OSF, or Zenodo. Or otherwise can be found in zip files in the supplementary material.
+
+# Let's make a lifetable:
+
+Here's how to use these functions in a single `mutate()` call to build a full lifetable; just get the names right, use the arguments right, and do the steps in the right order:
+```{r}
+toymx |> 
+  mutate(ax = .5,
+         qx = mx_to_qx(mx = mx, ax = ax),
+         lx = qx_to_lx(qx, radix = 1),
+         dx = lxqx_to_dx(lx,qx),
+         Lx = lxdx_to_Lx(lx,ax,dx),
+         Tx = Lx_to_Tx(Lx),
+         ex = Txlx_to_ex(Tx,lx))
+```
+
+But what it we had to do this for tons of lifetables? Then what? Do we need to copy paste that a bunch of times? NOOOOOO
+
+```{r}
+hmd <- read_csv("https://github.com/timriffe/BSSD2023Module1/raw/master/Data/hmd.csv.gz", show_col_types = FALSE)
+
+# see what countries are in there:
+# hmd |> 
+#   pull(country) |> 
+#   unique()
+hmd_computed <- 
+  hmd |> 
+  group_by(country, sex, year) |> 
+    mutate(ax = .5,
+         qx = mx_to_qx(mx = mx, ax = ax),
+         lx = qx_to_lx(qx, radix = 1),
+         dx = lxqx_to_dx(lx,qx),
+         Lx = lxdx_to_Lx(lx,ax,dx),
+         Tx = Lx_to_Tx(Lx),
+         ex = Txlx_to_ex(Tx,lx)) |> 
+  ungroup()
+```
+
+
+```{r}
+my_lifetable <- function(age,mx,ax){
+  qx = mx_to_qx(mx = mx, ax = ax)
+  lx = qx_to_lx(qx, radix = 1)
+  dx = lxqx_to_dx(lx,qx)
+  Lx = lxdx_to_Lx(lx,ax,dx)
+  Tx = Lx_to_Tx(Lx)
+  ex = Txlx_to_ex(Tx,lx)
+  
+  out <- tibble(age, 
+                mx, 
+                ax, 
+                qx, 
+                lx, 
+                dx, 
+                Lx, 
+                Tx, 
+                ex)
+  return(out)
+}
+```
+The above lifetable function has 3 arguments, each a vector. It's OK, but it won't work well in a tidy workflow because we don't (at least that I'm aware) have a version of `mutate()` that can create columns in bulk by a single function call. There is another `mutate()`-like function called `group_modify()` where you can apply a function premised on receiving the whole chunk of data (a tibble or data.frame) and returning a tibble / data.frame. That motivates the creation of the second lifetable function below (`my_lifetable_tibble()`, which simply extracts the vectors needed by `my_lifetable()` and applies it.
+
+```{r}
+my_lifetable_tibble <- function(data_chunk){
+  
+  # create the 3 vectors needed by our first lifetable function
+  age <- data_chunk |> pull(age)
+  mx  <- data_chunk |> pull(mx)
+  ax  <- data_chunk |> pull(ax)
+  
+  # now apply our first version of the function
+  out <- my_lifetable(age, 
+                      mx, 
+                      ax )
+  return(out)
+}
+# my_lifetable(age,mx,ax)
+# toymx |> 
+#   mutate(ax=.5) |> 
+#   my_lifetable_tibble()
+# 
+```
+
+To comment out multiple lines: select the lines, then `Ctrl Shift c` (`Cmnd Option c` on mac).
+
+To get a multi-line cursor, hold down `Alt` (`Shift Option` on mac) and drag the cursor down. Click again to go back to single line cursor.
+
+```{r}
+hmd_complete <-
+  hmd |> 
+  group_by(country, sex, year) |> 
+  group_modify(~ my_lifetable_tibble(.x)) |> 
+  ungroup()
+```
+
+This will yield an identical result to the case where we did all HMD lifetables using `group_by()` and `mutate()`. The difference is that we've applied a single function instead of needing to create a multi-line `mutate()` call, which would require (3 months from now) good memory.
+
+
+
+
+
+
+
+
+
+
+
+
+
