@@ -1,0 +1,106 @@
+---
+title: "Session 3 Notes"
+author: "Tim Riffe"
+date: "2023-07-05"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Functions
+
+What is a function? A function maps some inputs to an output. There
+could be one or more inputs, and likewise for outputs.
+
+-   `my_adder` is the name of the function
+-   `function()` is the formal way to declare the named object as a
+    function (rather than as data)
+-   `()` we list the names of the arguments (parameters)
+-   `{}` we create the function body; The function body only *sees* the
+    arguments. It should not be written to use data objects sitting
+    around in your R session. What happens in the function stays in the
+    function. Don't be bashful. Main thing is it gets the job done.
+-   `return()` is what comes out; nothing else comes out.
+
+```{r}
+
+my_adder <- function(number1, number2){
+  the_sum <- number1 + number2
+  return(the_sum)
+}
+my_adder(number1 = 3, number2 = 4)
+my_adder(number1 = 3:10, number2 = 4:11)
+```
+
+Another function example: Let's make a Gompertz mortality function.
+$$ \mu(x) = \alpha e^{\beta x}$$
+
+-    $\mu(x)$ is the force of mortality at age $x$
+
+-   $\alpha$ is a baseline scalar of mortality
+
+-    $\beta$ is the pace of senescence (the proportional increase in
+    mortality in each age step)
+
+-   $x$ is age
+
+```{r}
+gomp_mx <- function(a, b, age){
+  mx <- a * exp(b * age)
+  return(mx)
+}
+```
+
+These are our test parameters
+```{r}
+age     <- 0:110
+alpha   <- 0.0001
+beta    <- .08
+library(tidyverse)
+toymx <- 
+  tibble(age = age,
+         mx = gomp_mx(a = alpha,
+                      b = beta, 
+                      age = age))
+```
+
+## $q(x)$
+
+$$ q(x) = \frac{\mu(x)}{1 + (1 - a(x)) \cdot \mu(x)}   $$
+Make a function called `mx_to_qx()`. It will need arguments `mx` and `ax`. Go ahead
+
+```{r}
+ax <- rep(.5, times = 111)
+mx <- toymx |> pull(mx)
+# mx <- gomp_mx(a,b,age)
+mx_to_qx <- function(mx, ax){
+  qx <- mx / (1 + (1 - ax) * mx)
+  return(qx)
+}
+qx <- mx_to_qx(mx, ax)
+```
+Note: Why 111? Because the toy data goes up to age 110, and don't forget age 0 when counting elements.
+`rep()` repeats a value `times` times.
+
+`mx <- toymx |> pull(mx)` creates a vector called `mx` by pulling off a column of `toymx`. We could have also just made `mx` directly by using that original function not inside a tibble: `mx <- gomp_mx(a,b,age)`. I just opted to work with toy vectors rather than a tibble, sorry for that.
+
+How to use a function:
+```{r}
+# toymx |> 
+#   mutate(ax = .5,
+#          qx = mx_to_qx(mx = mx, ax = ax))
+qx <- mx_to_qx(mx, ax)
+```
+
+# Convert $q(x)$ to $l(x)$
+
+$$ l(x) = \prod _{i=0}^x 1 - q(i) $$
+Except the very first $l(x)$ should be a clean number like 1. 
+I suggest using the `cumprod()`.
+And recall that you can append a value to a vector with `c()`
+Call the function `qx_to_lx()`
