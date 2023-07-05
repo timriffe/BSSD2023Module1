@@ -104,3 +104,23 @@ Except the very first $l(x)$ should be a clean number like 1.
 I suggest using the `cumprod()`.
 And recall that you can append a value to a vector with `c()`
 Call the function `qx_to_lx()`
+
+```{r}
+qx_to_lx <- function(qx, radix = 1){
+  lx <- cumprod(1 - qx)
+  lx <- c(1,lx)
+  lx <- lx[1:length(qx)]
+  lx <- radix * lx
+  return(lx)
+}
+lx <- qx_to_lx(qx)
+# sum(lx)
+# sum(lx) - .5
+```
+
+## $d(x)$ is the death distribution
+
+
+
+
+
