@@ -80,6 +80,7 @@ mx <- toymx |> pull(mx)
 # mx <- gomp_mx(a,b,age)
 mx_to_qx <- function(mx, ax){
   qx <- mx / (1 + (1 - ax) * mx)
+  qx[length(qx)] <- 1
   return(qx)
 }
 qx <- mx_to_qx(mx, ax)
@@ -120,7 +121,17 @@ lx <- qx_to_lx(qx)
 
 ## $d(x)$ is the death distribution
 
+$$d(x) = l(x)q(x)$$
+It's also the same as:
 
+$$ d(x) = l(x+1) - l(x)$$
+$$ d(x) = -(l(x) - l(x+1)) $$
+However, these last two are bit more tedious to code because you need to think about vector lengths. For the first one using `lx` an `qx` everything is already the right length.
 
-
+```{r}
+lxqx_to_dx <- function(lx,qx){
+  lx * qx
+}
+dx <- lxqx_to_dx(lx,qx)
+```
 
