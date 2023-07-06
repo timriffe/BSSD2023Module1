@@ -1,0 +1,89 @@
+---
+title: "Session 3 Solutions"
+author: "Tim Riffe"
+date: "2023-07-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Exercises
+
+**\large Exercise 1.3.1: ** 
+ 
+Read in the dataset `Data/hmd.csv.gz`:
+
+```{r}
+library(tidyverse)
+hmd <- read_csv("https://github.com/timriffe/BSSD2023Module1/raw/master/Data/hmd.csv.gz")
+```
+
+This dataset is the entire HMD, where there is a lifetable subset for each unique combination of `country`, `sex`, and `year`. Complete the lifetable for the entire dataset **using your new function in a tidy pipeline**.
+
+```{r}
+library(tidyverse)
+source("https://raw.githubusercontent.com/timriffe/BSSD2023Module1/master/my_functions.R")
+hmd_completed <-
+  hmd |> 
+  group_by(country, sex, year) |> 
+  group_modify(~my_lifetable_tibble(.x)) |> 
+  ungroup()
+```
+
+Let's have a look at life expectancy at birth:
+```{r, warning = FALSE}
+hmd_completed |> 
+  filter(age == 0) |> 
+  ungroup() |> 
+  ggplot(aes(x=ex, fill = sex))+
+  geom_density(alpha = .4)
+```
+
+
+**\large Exercise 1.3.2: ** 
+
+$e(x)^\dagger$, pronounced e-dagger is the average year of life lost due to death in the lifetable, and one way to calculate it looks like this:
+
+$$ e(x)^\dagger = \sum_{i=x}^\omega \frac{d(i)}{l(x)}  e(x) $$
+That is to say, this is a function patterned by age $e(x)^\dagger$. If you want to calculate this for each age then you'll probably want to write a loop, which we've not done yet. But you can calculate it for age 0 without a loop, in which case (if the lifetable radix is 0):
+
+ $$ e(0)^\dagger = \sum_0^\omega d(x)e(x)$$
+Write a function that does this, and calculate $e(0)^\dagger$ for each Country, Sex, and Year. Also save $e(0)$, i.e. the value of $e(x)$ where `Age == 0`. Are you going to do this with `mutate()` or with `summarize()`? Can you plot the relationship between $e(0)$ and $e(0)^\dagger$? Make a scatterplot of this. If it's super overlapped try transparency. Maybe add a `geom_smooth()` on top of it, your choice of method.
+
+```{r}
+calc_edag <- function(dx,ex){
+  # remove radix, if it was used:
+  dx    <- dx / sum(dx)
+  
+  # this is approximate
+  edag0 <- sum(dx * ex)
+  return(edag0)
+}
+```
+
+`summarize()` is like `mutate()`, but for aggregation actions. Calculating a summary measure from a range of ages is a type of aggregation. It works like so:
+
+```{r}
+hmd_summary <-
+  hmd_completed |> 
+  group_by(country, sex, year) |> 
+  summarize(e0 = ex[1],
+            edag0 = calc_edag(dx,ex),
+            .groups = "drop")
+```
+
+Visualize it:
+
+```{r}
+hmd_summary |> 
+  ggplot(aes(x = e0, 
+             y = edag0, 
+             color = sex)) +
+  geom_point(alpha = .1) +
+  facet_wrap(~ sex)
+```
+
+
