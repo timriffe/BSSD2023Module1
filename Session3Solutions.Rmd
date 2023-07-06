@@ -9,6 +9,25 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Review of functions:
+
+A function has a 
+1.    Name
+2.    Arguments
+3.    Body (what does it do with the arguments?)
+4.    What it returns
+
+You can make one yourself using this form:
+```{r}
+arbitrary_name <- function(arg1, arg2, ...){
+  # body starts here
+  # ....
+  #
+  return(result)
+}
+```
+
+
 
 # Exercises
 
@@ -19,9 +38,12 @@ Read in the dataset `Data/hmd.csv.gz`:
 ```{r}
 library(tidyverse)
 hmd <- read_csv("https://github.com/timriffe/BSSD2023Module1/raw/master/Data/hmd.csv.gz")
+
 ```
 
 This dataset is the entire HMD, where there is a lifetable subset for each unique combination of `country`, `sex`, and `year`. Complete the lifetable for the entire dataset **using your new function in a tidy pipeline**.
+
+There are a couple aspects of syntax here, like the `~` and the name of the anonymous data chunk (of grouped data) passing through the pipeline (`.x`). I actually didn't remember these details when it came time to write this piece of code yesterday. To get that crucial detail, I mindlessly copied a piece of example code from the help file, modified to my data, and crossed my fingers. It worked. I got the help file like this: `?group_modify`
 
 ```{r}
 library(tidyverse)
@@ -29,19 +51,18 @@ source("https://raw.githubusercontent.com/timriffe/BSSD2023Module1/master/my_fun
 hmd_completed <-
   hmd |> 
   group_by(country, sex, year) |> 
-  group_modify(~my_lifetable_tibble(.x)) |> 
+  group_modify(~ my_lifetable_tibble(data_chunk = .x)) |> 
   ungroup()
 ```
 
 Let's have a look at life expectancy at birth:
 ```{r, warning = FALSE}
+
 hmd_completed |> 
   filter(age == 0) |> 
-  ungroup() |> 
-  ggplot(aes(x=ex, fill = sex))+
+  ggplot(aes(x = ex, fill = sex))+
   geom_density(alpha = .4)
 ```
-
 
 **\large Exercise 1.3.2: ** 
 
@@ -54,7 +75,8 @@ That is to say, this is a function patterned by age $e(x)^\dagger$. If you want 
 Write a function that does this, and calculate $e(0)^\dagger$ for each Country, Sex, and Year. Also save $e(0)$, i.e. the value of $e(x)$ where `Age == 0`. Are you going to do this with `mutate()` or with `summarize()`? Can you plot the relationship between $e(0)$ and $e(0)^\dagger$? Make a scatterplot of this. If it's super overlapped try transparency. Maybe add a `geom_smooth()` on top of it, your choice of method.
 
 ```{r}
-calc_edag <- function(dx,ex){
+# this thing is not NA-proof. They'll mess it up.
+calc_edag <- function(dx, ex){
   # remove radix, if it was used:
   dx    <- dx / sum(dx)
   
@@ -72,18 +94,24 @@ hmd_summary <-
   group_by(country, sex, year) |> 
   summarize(e0 = ex[1],
             edag0 = calc_edag(dx,ex),
-            .groups = "drop")
+            .groups = "drop") 
+
 ```
 
 Visualize it:
 
-```{r}
+```{r, warning = FALSE}
 hmd_summary |> 
-  ggplot(aes(x = e0, 
-             y = edag0, 
-             color = sex)) +
+  ggplot(mapping = 
+           aes(x = e0, 
+               y = edag0, 
+               color = sex)) +
   geom_point(alpha = .1) +
-  facet_wrap(~ sex)
+  facet_wrap(~sex) +
+  theme_minimal() +
+  # how to turn of the legend created for a mapping
+  guides(color = "none") +
+  labs(title = "Usually improvement in life expectancy\nis paired with a decrease in lifespan inequality")
 ```
 
 
