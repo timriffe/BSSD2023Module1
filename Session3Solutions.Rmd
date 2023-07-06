@@ -68,7 +68,7 @@ hmd_completed |>
 
 $e(x)^\dagger$, pronounced e-dagger is the average year of life lost due to death in the lifetable, and one way to calculate it looks like this:
 
-$$ e(x)^\dagger = \sum_{i=x}^\omega \frac{d(i)}{l(x)}  e(x) $$
+$$ e(x)^\dagger = \sum_{i=x}^\omega \frac{d(i)}{l(x)}  e(i) $$
 That is to say, this is a function patterned by age $e(x)^\dagger$. If you want to calculate this for each age then you'll probably want to write a loop, which we've not done yet. But you can calculate it for age 0 without a loop, in which case (if the lifetable radix is 0):
 
  $$ e(0)^\dagger = \sum_0^\omega d(x)e(x)$$
