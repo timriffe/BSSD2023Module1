@@ -42,12 +42,19 @@ Txlx_to_ex <- function(Tx, lx){
 # version of the lifetable that uses vector
 # arguments; 
 # 6 July
-my_lifetable <- function(age,mx,ax){
+my_lifetable <- function(age,mx,ax, close_method = "constant"){
   
   # ax closeout, use 1/mx
   # that is, the mean of a constant hazard 
   n     = length(mx)
-  ax[n] = 1/mx[n]
+  
+  if (close_method == "contstant"){
+    ax[n] = 1/mx[n]
+  }
+  
+  if (close_method == "my_nifty_method"){
+    # then use that code instead
+  }
   
   qx    = mx_to_qx(mx = mx, ax = ax)
   lx    = qx_to_lx(qx, radix = 1)

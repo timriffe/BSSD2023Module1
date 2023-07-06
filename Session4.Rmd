@@ -1,0 +1,220 @@
+---
+title: "Session 4 Notes"
+author: "Tim Riffe"
+date: "2023-07-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# `for` loops
+
+Motivation:
+For the session 3 exercise, we were able to calculate $e^\dagger$ for age 0 only because we don't yet have a good tool to iterate up the ages. The measure can indeed be recalculated at each age, and it's meaningful in each age.
+
+We need a way to iterate (repeat).
+
+First example: let's calculate a cumulative sum with a for loop
+```{r}
+x <- runif(10)
+# a place to store the result:
+xc <- x * 0 # we'll over-write this anyway
+
+for (iterator in 1:10){
+  xc[iterator] <- sum(x[1:iterator])
+}
+xc + 2
+
+```
+
+Lots of kinds of parentheses, brackets, and braces.
+
+`()` are for the arguments of functions and function-like things, such as operators.
+For the for-loop, the name of the iterator and the values we iterate over are like the arguments.
+
+`[]` square brackets are for indexing
+
+`{}` curly brackets define or delimit bodies of code. We'll use these today a bunch.
+
+In the above example our iterator was used to index a position. But it can be used flexibly. It could be an actual value. It doesn't necessarily need to index a position.
+
+Here's an example of using actual values as the iterator:
+```{r}
+simpsons <- c("Homer","Marge","Bart","Lisa","Maggie", "Santa's little helper")
+for (s in simpsons){
+  print(s)
+}
+```
+
+A nice thing about for-loops is that what you do in one step *can* depend on what you did in previous steps. That is, you can have dependencies in for loops. That's neat.
+
+First, make a vector of length 20
+Put the value 1 in the first two elements of it.
+Make the iterator go from 3 until 20.
+Use the iterator to index position.
+The `i`th elements of the result should be the sum of the previous two elements.
+
+```{r}
+fib_numbers <- c(1,1,rep(0,18))
+for (i in 3:20){
+  prev_two         <- (i-2):(i-1)
+  fib_numbers[i]   <- sum(fib_numbers[prev_two])
+  # fib_numbers[i] <- fib_numbers[prev_two] |> sum()
+}
+```
+
+Most of the time in practice, an iterator is used to index a position. But there are times where the use is sort of ambiguous, like when you're indexing over single ages, but age is also used on a formula, such that you can use the iterator directly in a formula. Maybe not worth demonstrating, BUT, if you see a loop, the first thing you should do is identify what the iterator is called and how it is being used.
+
+You can also loop over two things at a time (or more). Loops can be inside of loops.
+
+```{r}
+A <- matrix(runif(10*20), ncol = 20, nrow = 10)
+for (i in 1:10){
+  for (j in 1:20){
+    A[i,j] <- sum(A[1:i, 1:j])
+  }
+}
+```
+
+This is a sort of prelim for some of the types of data operations that Marie Pier will do. To index a 2-d object (matrix) use the same square brackets, and two index locations, separated by a comma, where the first one refers to rows and the second to columns.
+
+`A[i,j]` means the ith row and jth column of `A`, always.
+
+`A[1:i,1:j]` means the submatrix of A going from the 1st to the ith row and 1st to the jth column.
+
+# Exercise
+Use this technique to calculate $e^\dagger$ for all ages.
+Tips: 
+- make a container called `edag` or similar.
+- Index position 1:111
+- You need to select out the correct parts of dx and ex for each age step
+- `dx` needs to be rescaled each age step in the iteration
+
+```{r}
+calc_edag_vec <- function(dx, ex){
+  n     <- length(dx)
+  # container
+  edag  <- rep(0,n)
+  
+  # i goes up age
+  for (i in 1:n){
+    # select dx from age i until the top and rescale it
+    dxi     <- dx[i:n] / sum(dx[i:n])
+    
+    # the sum of the product of dxi and ex ages i and higher.
+    edag[i] <- sum(dxi * ex[i:n])
+  }
+  return(edag)
+}
+```
+
+Let's apply this in a tidy pipeline using `mutate()` (because it should give back a vector the same length as its arguments).
+
+```{r}
+library(tidyverse)
+source("https://raw.githubusercontent.com/timriffe/BSSD2023Module1/master/my_functions.R")
+hmd <- read_csv("https://github.com/timriffe/BSSD2023Module1/raw/master/Data/hmd.csv.gz", show_col_types = FALSE)
+hmd_completed <-
+  hmd |> 
+  group_by(country, sex, year) |> 
+  group_modify(~ my_lifetable_tibble(data_chunk = .x)) |> 
+  mutate(edag = calc_edag_vec(dx, ex)) |> 
+  ungroup()
+```
+
+Plot the ex by edag in scatterplots by sex, for selected ages e.g. 0,15,45,65
+
+```{r, warning = FALSE}
+hmd_completed |> 
+  filter(age %in% c(0,15,45,65)) |> 
+  ggplot(mapping = aes(x = ex,
+                       y = edag,
+                       color = sex)) +
+  geom_point(alpha = .1) +
+  facet_grid(rows = vars(age),  
+             cols = vars(sex))
+```
+
+# conditional programming
+
+You can toggle whether or not a body of code gets executed using an `if` statement.
+For this, you need to define a condition.
+
+```{r}
+x <- rnorm(10)
+if (mean(x)){
+  print("You win!")
+}
+```
+
+In the above example, `x` contains random draws from a standard normal, and their actual mean could be greater or less than zero. In the `if()` statement we specify only to execute the code in the body if the mean is greater than 0.
+
+You can set the condition to TRUE or FALSE by hard-coding it too. In that case the code will always or never be executed. That sounds weird, but in practice can be useful. Say you have some heavy calculations or simulations or whatever sitting in a script, and you don't want to ever execute them without your manual intervention. Then you can wrap that code inside of an if statement set to to FALSE. Then the only way to execute it is via your manual intervention.
+
+I showed some examples of `if` being used in functions to toggle behavior. For example, we might imagine a different closeout method for our lifetable, so I added a `close_method` argument to it, with a default value set to pick our current behavior (constant hazard). But it could be modified in the future if we had other methods for that.
+
+We also saw how `if` was used in `LifeIneq` functions to let the users decide whether to perform data checks before calculating, or to adapt code to different choice of central tendency (mean, median, mode, etc)- all done with `if`.
+
+```{r}
+x <- rnorm(10)
+if (mean(x) > 0){
+  print("You win!")
+} else {
+  print("You lose!")
+}
+```
+
+These constructions can also nest, but please do try to avoid this:
+```{r}
+x <- rnorm(10)
+the_mean <- mean(x)
+print(mean(x))
+if (the_mean > 0){
+  print("You win!")
+} else {
+  if (the_mean <= 0 & the_mean > -.1){
+    print("I don't know whether you win or lose")
+  } else {
+    print("You lose!")
+  }
+}
+```
+
+Really, only build code like that if it's totally necessary. You cna probably see how legibility reduces as complexity increases with nested if statements.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
