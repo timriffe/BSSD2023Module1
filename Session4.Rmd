@@ -332,33 +332,190 @@ coale_r <- function(fxf, Lx, G = 29, maxit = 50, tol = 10^-12){
 r <- coale_r(fxf, Lx, G = 29)
 ```
 
+# Review of recent concepts
+
+Functions, they are handy, and sometimes you can get away with writing one *after* the hard work is done. i.e. after you figure out how to solve a problem with code, then much of the time, it doesn't cost too much extra work to turn it into a function. That might save you or others time in the future.
+
+`for` loops for repetitive code execution i.e. iteration. We've seen iterators being used to index positions (in your data inputs, or in the output object that you're populating in the loop). We've also seen, in an earlier rendition of the Collatz function, the iterator being used for its actual value. Usually we just use them for indexing though. Or not at all.
+
+`if` triggers whether or not a block of code (inside `{}`) gets executed or not.
+
+But `if` all by itself, or `if` together with `else` would be a very clunky approach to doing something like recoding a variable. Which is a common problem to solve.
+
+# `if_else()`
+```{r}
+
+x <- 1:10
+if_else(x %% 2 == 0,  # needs to be TRUE or FALSE for each value of x
+        x / 2, # if it's TRUE we do this
+        x * 3 + 1) # FALSE then do this
+(x %% 2 == 0)
+```
+
+How can we recode with this construct?
+```{r}
+A <- tibble(variable = letters[1:5])
+A |> 
+  mutate(new_codes = if_else(variable %in% c("a","b"),
+                             "Group 1",
+                             "Group 2"))
+
+A |> 
+  mutate(new_codes = if_else(variable %in% c("a","b"),
+                            "Low",
+                            if_else(variable %in% c("d","e"),
+                                    "High",
+                                    "Middle")))
+```
+
+# `case_when()` is the tool for you
+
+When you have 3 or more result categories, then use `case_when()`. Comma-separate the cases, where each case follows the pattern: `logical condition ~ new code`. You either need to account for all cases (might be laborious) or include a catch-all at the end, using `TRUE`.
+```{r}
+A |> 
+  mutate(new_codes = case_when(variable %in% c("a","b") ~ "Low",
+                               variable == "c" ~ "Middle",
+                               TRUE ~ "High"))
+```
+
+discretization: how to do this for quantitative variables. In this case, just decide whether the output is numeric or character (or something else)
+
+```{r}
+A |> 
+  mutate(var2 = runif(5),
+         var2_binned =
+           case_when(var2 < .4 ~ "Low",
+                     var2 > .6 ~ "High",
+                     TRUE ~ "Middle"),
+         var2_binnedq =
+           case_when(var2 < .4 ~ 0,
+                     var2 > .6 ~ .6,
+                     TRUE ~ .4))
+```
+
+There are helper functions for binning in predefined intervals, or within intervals of a specifed width:
+```{r}
+cut_interval(1:100, 10)
+table(cut_interval(1:100, 11))
+table(cut_width(runif(1000), 0.1))
+A |> 
+  mutate(var2 = runif(5),
+         var3 = cut_width(var2, .2))
+```
+
+For truncation, simple use `filter()`, but to aggregate to an open age group, recode age inside `mutate()`, then group by age and aggregate using `summarize()`.
+
+For the above case I imagined the situation where you have register microdata (big) with a quantitative variable that you want to bin. Then 1. use `cut_interval()` or `cut_width()` to recode that variable and 2. `group_by() |> summarize()` to aggregate it.
+
+# `*_join()` for more complicated cases
+
+Use the `left_join()` approach rather than the `case_when()` approach whenever you have tons of codes to account for. Do it this way because then your lookup table is (i) outside the code (reduce clutter), (ii) can be independently maintained, (iii) can be shared. This definitely makes sense for geographic areas, and for ICD codes, but maybe also other things beyond my experience.
+```{r}
+gapreminder <- read_csv("https://raw.githubusercontent.com/timriffe/BSSD2023Module1/master/Data/gapreminder.csv", show_col_types = FALSE)
+
+lookup <- read_csv("https://raw.githubusercontent.com/timriffe/BSSD2023Module1/master/Data/iso3continent.csv",show_col_types = FALSE)
+
+gapreminder |> 
+  left_join(lookup, by = "iso3")
+```
+
+# Review
+
+1. You can do a lot if your data is already tidy. We did that with `ggplot()` graphics.
+2. `ggplot()` composes a plot by specifying a mapping using `mapping = aes()`. That should include some coordinates (x, or y, or both), and potentially other things like `color`, `size`, etc. `groups` is also a mapping.
+3. then you need a `geom_*()` or more.
+4. `scale_*()` to log an axis or do some other similar transformation
+
+I encourage you to get really comfortable with this plotting package, and to always visualize as you do your coding. This is to make sure things are behaving as expected. The vast majority of plots are diagnostic plots meant to be seen by you only. Don't invest time in those, just make them quick and cheap.
+
+But, you can only map a variable if it's represented as a column in your data. Meaning your data has to be tidy. What if it isn't?
+
+Then you need to do data wrangling. Here's a similar workshop repository on that: <https://github.com/timriffe/EDSD2022data>
+Also see the data wrangling cheat sheet, and tidy data cheat sheet from R studio.
+
+We saw functions for `read_*()`ing in data from excel, csv. Reading from spreadsheets takes a bit of extra work to figure out the spreadsheet. csv is the most shareable data format.
+
+We saw how to `filter()` rows and `select()` / `rename()` columns.
+We saw how to `mutate()`, `summarize()`, and how to do so within groups using `group_by()`. Never forget to `ungroup()` when you're done.
+
+`pivot_longer()` is used to stack variables
+`pivot_wider()` spreads out a variable over columns
+
+You can rip off a column using `pull()`, which we did in order to get test variables for lifetables and similar.
+
+In the handouts you'll see `separate()` being used to split a column.
+
+We also saw `*_join()` for merging data after categories for the key have already been harmonized.
+
+That's all for data wrangling (Tuesday)
+
+Wednesday we saw function programming on the example of the life table. 
+We set it up for modular functions. The means, we made a function for each column transformation. We then combined our functions in what we call wrapper functions, in order to produce the whole life table, or to make a second version fo the lifetable function that can click into a tidy pipeline (data.frame in, data.frame out, using `group_modify()`).
+
+We then applied our lifetable function to a big dataset using `group_by()`.
+
+I argued that creating functions allows for easier sharing of methods, and that it's also better for you because then you only need to maintain the code in one place. I showed a primitive way of reading in functions using `source()` from github. The next best thing is to make a package, which is a different class. I also or described how people use `source()` to set up their reproducibility packs.
+
+Then we talked about more specific programming tools, like iteration `for` and conditional execution, with `if`. We even combinded these tools in three different functions today.
+
+Finally we saw how cool `case_when()` is for recoding, and to use `left_join()` for larger cases.
+
+You got a course on reproducibility for free because we did everything inside of R projects of RStudio, which are self-contained (hermetically sealed) projects, ergo portable, and we forced the code to be clean by using `Rmarkdown`, and also taught *literate* programming. That means text and code together. That's a great tool both for research, but also report generation.
+
+Remember, you can decide whether the code should be shown or hidden when sharing output generated by markdown. So cater to your audience.
+
+I also mentioned that you might want to check out the code produced by researchers that you follow.
 
 
 
 
 
-# Big Exercise:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}
-library(tidyverse)
-read_tsv("https://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?file=data/hlth_ehis_tadle.tsv.gz",
-         na = ":",
-         show_col_types = FALSE) |> 
-  separate(`2019`,into = c("2019",NA),sep = " ") |> 
-  mutate(`2019` = parse_number(`2019`)) |> 
-  separate(col = `unit,yes_no,sex,age,geo\\time`,
-           sep = ",",
-           into = c("unit", "yes_no", "sex", "age","iso2")) |> 
-  pivot_longer(c(`2019`,`2014`), 
-               names_to = "year", 
-               values_to = "health")
 
-
-# remotes::install_github("ropengov/eurostat")
-library(eurostat)
-dat <- get_eurostat("hlth_ehis_tadle", time_format = "num")
-dat
 ```
 
 
