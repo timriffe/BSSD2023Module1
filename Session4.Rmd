@@ -184,10 +184,182 @@ if (the_mean > 0){
 
 Really, only build code like that if it's totally necessary. You cna probably see how legibility reduces as complexity increases with nested if statements.
 
+# If and for together
+
+Newton's method for finding a square root:
+```{r}
+x     <- 123 # the number we want the sqrt of
+guess <- 2   # <- a terrible guess
+newton_sqrt <- function(x, guess = 5, maxit = 100, tol = 10^-12){
+  for(i in 1:maxit){
+    # step 1: calculate the "other part" of the supposed
+    quotient     <- x / guess
+    # average w previous guess
+    average      <- (quotient + guess)/2
+    # store the old guess so that we can check if we've converged
+    oldguess     <- guess
+    # the new guess comes from current average
+    guess        <- average
+    
+    # this is for checking convergence
+    abs_change   <- abs(guess-oldguess)
+    if (abs_change <= tol){
+      # if the above evaulates to TRUE, then
+      # the loop stops, using break
+      break
+    } 
+  }
+  return(guess)
+}
+guess
+sqrt(123)
+ # Re a question on making the random guess come from a dist
+newton_sqrt(123, guess = rpois(1, 10))
+```
+
+New concepts:
+`break`: you can make a loop stop running before it gets to the end of its iterator by triggering `break` with an `if` statement.
+
+We then wrapped the algorithm in a function to make our own square root calculator. That was an afterthought, for the sake of review. We decided to foresee which elements of the algorithm a user might want to change, and to turn them into arguments: `maxit` and `tol`, which were previously hard coded to what their current default values are.
+
+# Again, with a different algorithm:
+
+Here's let's make a function that calculates the Collatz number of a positive integer. The Collatz conjecture states that any positive integer can be reduced to one by following this algorithm:
+1.    If the integer is 1 then stop
+2.    If the integer is even, then divide by 2
+3.    If the integer is odd, multiply by 3 and add 1.
+The number of steps it takes to get to 1 is the Collatz number of the integer. This is as far as I know an unproven conjecture. This function does it, let's take a tour and annotate as we go.
+```{r}
+
+Collatz <- function(number, maxit = 1e5){
+	number  <- as.integer(number)
+	Cnumber <- 0 
+	for (fake.iterator in 1:maxit){ 
+	  if (number == 1){
+	    break
+	  } else {
+			Cnumber <- Cnumber + 1    
+			if (number %% 2 == 0){
+				number <- number / 2
+			} else {
+				number <- number * 3 + 1
+			}
+	  }
+	}
+	return(Cnumber)
+}
+```
+The above function implements the calculation steps for a Collatz number. `if` is used to trigger a break in the loop if we're done. It's also used to trigger which arithmetic transformation we need to apply, depending on which we have a positive or negative integer at this step.
+`%%` gives us a remainder after division. It's 0 if the number divides cleanly. We often use modulo in demography to group ages. Like so:
+
+```{r}
+x <- rpois(20, lambda = 10)
+age <- 0:19
+tibble(x=x, age = age) |> 
+  mutate(age5 = age - age %% 5) |> 
+  group_by(age5) |> 
+  summarize(x = sum(x))
+```
+Modulo (`%%`) is being used here to determine which 5-year age group a given single age belongs to. Then we can use `dplyr` tricks to perform the aggregation. We want to aggregate in groups, where groups are the new age categories, ergo `group_by(age5)`. The aggregation action is done with summarize, in this case overwriting `x`. You might want to use this trick if ever combining data sources delivered in different age groups. The alternative is to somehow bring everything to single ages and then merge.
+
+```{r}
+how_high              <- 10000
+my_integers           <- 1:how_high
+their_collatz_numbers <- rep(0,how_high)
+for (i in 1:how_high){
+  their_collatz_numbers[i] <- Collatz(my_integers[i])
+}
+
+tibble(i = my_integers,
+       Collatz = their_collatz_numbers) |> 
+  ggplot(aes(x = i, y = Collatz)) +
+  geom_point()
+```
+
+# Exercise
+
+Let's implement Ansely Coale's 1955 proposal to optimize the intrinsic growth rate `r`.
+
+
+```{r}
+# Loads two objects: Lx and fxf
+source("https://gist.githubusercontent.com/timriffe/4d21788219b1c6ec0dc0acec9cd7f2fa/raw/a4e039d23d536e84edc9547a34439cf4a3b67f84/coale.R")
+
+R0 = sum(Lx * fxf)
+G = 29
+```
+
+$$R_0 = e^{r*G}$$
+$$log(R_0) = r* G$$
+$$log(R_0) / G = r$$
+
+1. $L(x)$
+2. $f(x)^f$ ASFR for girl births
+3. $x$ a vector of ages.
+
+Steps to follow:
+
+1. calculate $$R(0) = \sum L(x)f(x)^f$$
+2. assume a parameter $G = 29$
+3. calculate a guess at $r$, the first of several, call it $r^i$, the $i^{th}$ guess: $$r^i = \frac{log(R(0))}{G}$$
+4. Now in a for-loop we update $r^i$ in two steps. 
+   i) calculate a residual $$\delta = \left[\sum e^{(-r^i x)}f(x)^fL(x)\right] - 1$$ 
+   ii) update $r^i$ using $$r^{i+1}= r^i + \frac{\delta}{G-\frac{\delta}{r^i}}$$
+5. Repeat step 4 until $\delta$ is teeny tiny, i.e. until $$1 = \sum e^{(-r^i x)}f(x)^fL(x)$$
+Usually this takes less than 10 iterations, but you can let it go for more than that.
+
+When you get the loop written, wrap it in a function whose arguments are $f(x)^f$, $L(x)$, and $x$, and which returns $r$.
+
+
+```{r}
+coale_r <- function(fxf, Lx, G = 29, maxit = 50, tol = 10^-12){
+  R0 <- sum(fxf * Lx)
+  ri <- log(R0) / G
+  x  <- 0:(length(fxf)-1)
+  for (i in 1:maxit){
+    deltai <- sum(exp(-ri * x) * fxf * Lx) - 1
+    ri     <- ri + (deltai / (G - (deltai / ri)))
+    
+    # this is just like delti, isn't it?
+    resid <- abs(sum(exp(-ri * x) * fxf * Lx) - 1)
+    if (resid < tol){
+      break
+    }
+  }
+  return(ri)
+}
+
+r <- coale_r(fxf, Lx, G = 29)
+```
 
 
 
 
+
+
+# Big Exercise:
+
+
+```{r}
+library(tidyverse)
+read_tsv("https://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?file=data/hlth_ehis_tadle.tsv.gz",
+         na = ":",
+         show_col_types = FALSE) |> 
+  separate(`2019`,into = c("2019",NA),sep = " ") |> 
+  mutate(`2019` = parse_number(`2019`)) |> 
+  separate(col = `unit,yes_no,sex,age,geo\\time`,
+           sep = ",",
+           into = c("unit", "yes_no", "sex", "age","iso2")) |> 
+  pivot_longer(c(`2019`,`2014`), 
+               names_to = "year", 
+               values_to = "health")
+
+
+# remotes::install_github("ropengov/eurostat")
+library(eurostat)
+dat <- get_eurostat("hlth_ehis_tadle", time_format = "num")
+dat
+```
 
 
 
